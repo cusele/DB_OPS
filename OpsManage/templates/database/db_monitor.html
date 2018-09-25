@@ -1,0 +1,367 @@
+{% extends 'index.html' %}
+{% block ace-content %}
+<link rel="stylesheet" href="/static/dist/css/font-awesome.min.css">
+<link rel="stylesheet" href="/static/dist/css/jquery.orgchart.css">
+<!-- <script src="/static/js/jquery-1.8.3.min.js"></script> -->
+<script src="/static/js/highcharts.js"></script>
+<script src="/static/js/highcharts-more.js"></script>
+<style type="text/css">
+	#chart-container { text-align: left; }
+    .orgchart { background: #fff; }
+    .orgchart td.left, .orgchart td.right, .orgchart td.top { border-color: #aaa; }
+    .orgchart td>.down { background-color: #aaa; }
+    .orgchart .middle-level .title { background-color: #006699; }
+    .orgchart .middle-level .content { border-color: #006699; }
+    .orgchart .product-dept .title { background-color: #009933; }
+    .orgchart .product-dept .content { border-color: #009933; }
+    .orgchart .rd-dept .title { background-color: #993366; }
+    .orgchart .rd-dept .content { border-color: #993366; }
+    .orgchart .pipeline1 .title { background-color: #996633; }
+    .orgchart .pipeline1 .content { border-color: #996633; }
+    .orgchart .frontend1 .title { background-color: #cc0066; }
+    .orgchart .frontend1 .content { border-color: #cc0066; }
+	td.details-control {
+	    background: url('/static/img/details_open.png') no-repeat center center; */
+	    cursor: pointer;
+	}
+	tr.shown td.details-control {
+	    background: url('/static/img/details_close.png') no-repeat center center;
+	}
+</style>
+{% endblock %}
+{% block page-content %}
+<div id="page-wrapper">
+	<div class="row">
+          <div class="col-lg-12">
+              <div class="panel panel-default">
+                  <div class="panel-heading">
+                      <i class="fa fa-keyboard-o  fa-fw"></i> 资产查询
+                  </div>
+                  <div class="panel-body">
+
+				      <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">项目:</label>
+								<div class="col-sm-8">
+									 <select class="form-control" id="seldb_Project" >
+									 	<option selected="selected" value="">请选择一个类型</option>
+									 	{% for b in baseAssets.project %}
+									 		<option value="{{b.id}}" name="db_project">{{b.project_name}}</option>
+									 	{% endfor %}
+									</select>
+								</div>
+							</div>
+				      </div>
+				      <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">DB类型:</label>
+								<div class="col-sm-8">
+									 <select class="form-control" id="seldb_type" >
+									 	<option selected="selected" value="">请选择一个类型</option>
+											<option value="MySQL" name="db_type" >MySQL</option>
+											<option value="Redis" name="db_type" >Redis</option>
+											<option value="Mongodb" name="db_type" >Mongodb</option>
+											<option value="MyCAT" name="db_type" >MyCAT</option>
+											<option value="Oracle" name="db_type" >Oracle</option>
+											<option value="MSSQL" name="db_type" >MSSQL</option>
+									</select>
+								</div>
+							</div>
+				      </div>
+<!-- 				      <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">IP地址:</label>
+							<div class="input-group">
+								<input type="text" class="form-control">
+								<span class="input-group-btn">
+									<button class="btn btn-default" type="button">Search</button>
+								</span>
+							</div>
+							</div>
+				      </div> -->
+				      <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">实例:</label>
+								<div class="col-sm-8">
+									 <select class="form-control" id="id" onchange="javascript:oBtdbSelect({{ds.id}});">
+									 	<option selected="selected" value="">请选择实例</option>
+									</select>
+								</div>
+							</div>
+				      </div>
+					  <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">监控项:</label>
+								<div class="col-sm-8">
+									<select class="form-control"  id="db_column"  >
+										<option selected="selected" value="-1">默认监控</option> 
+									</select>
+								</div>
+							</div>
+				      </div>
+                  </div>
+                  <div class="panel-footer">
+                  <div id="divSelectedType"></div>
+                  </div>
+              </div>
+          </div>
+     </div>
+	<div class="row">
+				<div class="col-lg-12">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<i class="fa fa-bar-chart-o fa-fw"></i> 监控数据
+							<div class="pull-right">
+								<div class="btn-group">　
+								</div>
+							</div>
+						</div>
+						<!-- /.panel-heading -->
+						<div class="panel-body">
+							<div id="morris-area-chart" style="width: 100%; height: 400px"></div>
+						</div>
+						<!-- /.panel-body -->
+					</div>
+				</div>
+	</div>
+    <script type="text/javascript">
+        var curpage = 1;
+        $(document).ready(function () {
+			//DB类型
+            $('#seldb_type').change(function () {
+                if ($('#seldb_type').val() != "") {
+                    $("#hdndb_type").val($('#seldb_type').val());
+                    var span = "<span class='label label-success' id='spandb_type'>" + $("#seldb_type").find("option:selected").text()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_type' type='hidden' value='"
+                    + $('#seldb_type').val() + "' /></span> &nbsp;";
+                    if ($("#spandb_type").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spandb_type").html($("#seldb_type").find("option:selected").text()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_type' type='hidden' value='"
+                         + $('#seldb_type').val() + "' /></span> &nbsp;");
+                    }
+                    oBtdbSelect();
+                    oBtcolSelect();
+                }
+            })
+
+			//设备状态
+            $('#db_column').change(function () {
+                if ($('#db_column').val() != "") {
+                    $("#hdndb_env").val($('#db_column').val());
+                    var span = "<span class='label label-success' id='spandb_env'>" + $("#db_column").find("option:selected").text()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_column' type='hidden' value='"
+                    + $('#db_column').val() + "' /></span> &nbsp;";
+                    if ($("#spandb_env").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spandb_env").html($("#db_column").find("option:selected").text()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_column' type='hidden' value='"
+                         + $('#db_column').val() + "' /></span> &nbsp;");
+                    }
+                     changepage(1);
+                }
+            })
+            //ip地址
+            $('#id').change(function () {
+                if ($('#id').val() != "") {
+                    var span = "<span class='label label-success' id='spanIp'>" + $("#id").val()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='id' type='hidden' value='"
+                    + $('#id').val() + "' /></span> &nbsp;";
+                    if ($("#spanIp").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spanIp").html($("#id").val()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='id' type='hidden' value='"
+                         + $('#id').val() + "' /></span> &nbsp;");
+                    }
+                    changepage(1);
+                }
+            })
+			//所属项目
+            $('#seldb_Project').change(function () {
+                if ($('#seldb_Project').val() != "") {
+                    $("#hdnProject").val($('#seldb_Project').val());
+                    var span = "<span class='label label-success' id='spanSelinux'>" + $("#seldb_Project").find("option:selected").text()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_project' type='hidden' value='"
+                    + $('#seldb_Project').val() + "' /></span> &nbsp;";
+                    if ($("#spanSelinux").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spanSelinux").html($("#seldb_Project").find("option:selected").text()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_project' type='hidden' value='"
+                         + $('#seldb_Project').val() + "' /></span> &nbsp;");
+                    }
+                }
+            })
+
+        })
+        function oBtdbSelect(){
+	 	   $('#id').removeAttr("disabled");
+	 	   var db_project=$('#seldb_Project').val();
+	 	   var db_type=$('#seldb_type').val();
+	 	   var db_id=$('#id').val();
+
+	 	   if ( db_id == "" ) {
+	 	   		db_id=0;
+
+	 	   }
+
+		   if ( db_type  != ''){
+				$.ajax({
+					dataType: "JSON",
+					url:'/db/search/', //请求地址
+					type:"POST",  //提交类似
+					data:{
+					db_project:db_project,
+					db_type:db_type,
+					type:2
+					},
+					success:function(response){
+
+						if (response["data"][db_id] == "" || response["data"][db_id] == "undefined" || response["data"][db_id]==null) {
+							v_info="请选择实例";
+							v_id=0;
+						}else{
+							v_info=response["data"][db_id];
+							v_id=db_id;
+						}
+						var binlogHtml = '<select multiple class="form-control"  name="id" id="id"  required><option name="id" value="'+v_id+'">'+v_info+'</option>'
+						var selectHtml = '';
+						$.each(response["data"],function(key,value){
+							selectHtml += '<option name="id" value="'+ key +'">' + value + '</option>'
+						});
+						binlogHtml =  binlogHtml + selectHtml +'<option name="id" value="-1">所有实例</option>'+ '</select>';
+						document.getElementById("id").innerHTML= binlogHtml;
+
+					},
+				});
+		   }
+		   else{
+			   $('#id option:selected').empty();
+			   $('#id').attr("disabled",true);
+		   }
+	    }
+
+		//选择监控项
+		function oBtcolSelect(){
+			var db_type=$('#seldb_type').val();
+	 	    var col_list={{baseAssets.monitor_column|safe}};
+		   	var db_column = $('#db_column').val();
+		   	db_type=db_type.toLowerCase();
+		   	//var db_columns = "xxx";
+		   if ( db_type  != ''   ){
+		   		//var col_num ='';
+		   		var col_num = col_list[db_type];
+				if ( db_column != "" && db_column != -1 ){
+							if ( col_num[db_column] == "" || col_num[db_column] == "undefined" || col_num[db_column]==null) {
+								v_info="默认监控";
+								v_id="";
+							}else{
+								v_info=col_num[db_column];
+								v_id=db_column;
+							}
+						}else{
+							v_info="默认监控";
+							v_id="";
+						}
+						var binlogHtml = '<select multiple class="form-control"  name="db_column" id="db_column"  required><option name="db_column" value="'+v_id+'">'+v_info+'</option>'
+						var selectHtml = '';
+						col_num=Object.keys(col_num).sort();
+						$.each(col_num,function(key,value){
+							selectHtml += '<option name="db_column" value="'+ value +'">' + value + '</option>'
+						});
+						binlogHtml =  binlogHtml + selectHtml +'<option name="db_column" value="">默认监控</option>'+ '</select>';
+						document.getElementById("db_column").innerHTML= binlogHtml;
+		   }else{
+			   $('#db_column option:selected').empty();
+			   $('#db_column').attr("disabled",true);
+		   }
+	    }
+
+
+        function changepage(pageindex) {
+            curpage = pageindex;
+            morris_highcharts();
+        }
+
+        function removeself(obj) {
+            $(obj).parent().remove();
+            changepage(1);
+        }
+
+		function morris_highcharts(){
+			var db_column=$('#db_column').val();
+	 	   	var db_project=$('#seldb_Project').val();
+	 	   	var db_type=$('#seldb_type').val();
+	 	   	var db_id=$('#id').val();
+			$.ajax({
+					type:"post",
+					url:"/db/monitor/",
+					data:{"db_id":db_id,"db_type":db_type,"db_project":db_project,"db_column":db_column},
+					dataType:"json",
+					success:function(data){
+						$("#morris-area-chart").highcharts({
+							chart: {"type": 'line', "zoomType": "x"},
+							title:data.data.title,
+							subtitle: data.data.subtitle,
+							xAxis:{ "type":"datetime"},//X轴数据
+							yAxis:{"title":{"text":""}},//Y轴数据
+							tooltip: { "pointFormat":" {series.name} <b> {point.y:,.0f}</b>",
+										// "pointFormat":'<span style="color:{series.color}">{series.name}</span>: <b>{point.percentage:.1f}%</b> ({point.y:,.0f} )<br>',
+										"shared":'true',
+										//"crosshairs":"true",
+										"valueSuffix":'°C'},
+							// 动画效果
+							plotOptions:{ "area":{
+										"stacking":'percent',
+										"lineColor": '#ffffff',
+										"lineWidth": 1,
+										"marker":{"lineWidth":'1',
+										"lineColor":'#ffffff'}
+								}},
+							series:data.data.series,
+							//不显示LOGO
+							credits:{"enabled":false},
+							//图例说明
+							legend:{"labelFormat":'{name}'},
+							lang:{
+									"contextButtonTitle" : "图表导出菜单",
+									"decimalPoint" : ".",
+									"downloadJPEG" : "下载JPEG图片",
+									"downloadPDF" : "下载PDF文件",
+									"downloadPNG" : "下载PNG文件",
+									"downloadSVG" : "下载SVG文件",
+									"drillUpText" : "返回 {series.name}",
+									"loading" : "加载中",
+									"months" : '["一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"]',
+									"noData" : "没有数据",
+									"numericSymbols" : '[ "千" , "兆" , "G" , "T" , "P" , "E"]',
+									"printChart" : "打印图表",
+									"resetZoom" : "恢复缩放",
+									"resetZoomTitle" : "恢复图表",
+									"shortMonths" : '[ "一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"]',
+									"thousandsSep" : ",",
+									"weekdays" :'["星期一", "星期二", "星期三", "星期三", "星期四", "星期五", "星期六","星期天"]'
+									},
+							global:data.data.global,
+							setOptions:{
+									"global":{"timezoneOffset":-8 * 60},
+									"decimalPoint": '.',
+									"thousandsSep":',',
+									"timezoneOffset":'+8 * 60',
+									"numericSymbols":'k,M,G,T,P,E'   
+								}
+						});
+					}
+			
+			});
+		}
+
+</script> 
+{% endblock %}

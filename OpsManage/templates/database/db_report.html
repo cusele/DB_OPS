@@ -1,0 +1,498 @@
+{% extends 'index.html' %}
+{% block ace-content %}
+<link rel="stylesheet" href="/static/dist/css/font-awesome.min.css">
+<link rel="stylesheet" href="/static/dist/css/jquery.orgchart.css">
+<!-- <script src="/static/js/jquery-1.8.3.min.js"></script> -->
+<script src="/static/js/highcharts.js"></script>
+<script src="/static/js/highcharts-more.js"></script>
+<style type="text/css">
+	#chart-container { text-align: left; }
+    .orgchart { background: #fff; }
+    .orgchart td.left, .orgchart td.right, .orgchart td.top { border-color: #aaa; }
+    .orgchart td>.down { background-color: #aaa; }
+    .orgchart .middle-level .title { background-color: #006699; }
+    .orgchart .middle-level .content { border-color: #006699; }
+    .orgchart .product-dept .title { background-color: #009933; }
+    .orgchart .product-dept .content { border-color: #009933; }
+    .orgchart .rd-dept .title { background-color: #993366; }
+    .orgchart .rd-dept .content { border-color: #993366; }
+    .orgchart .pipeline1 .title { background-color: #996633; }
+    .orgchart .pipeline1 .content { border-color: #996633; }
+    .orgchart .frontend1 .title { background-color: #cc0066; }
+    .orgchart .frontend1 .content { border-color: #cc0066; }
+	td.details-control {
+	    background: url('/static/img/details_open.png') no-repeat center center; */
+	    cursor: pointer;
+	}
+	tr.shown td.details-control {
+	    background: url('/static/img/details_close.png') no-repeat center center;
+	}
+</style>
+{% endblock %}
+{% block page-content %}
+<div id="page-wrapper">
+	<div class="row">
+          <div class="col-lg-12">
+              <div class="panel panel-default">
+                  <div class="panel-heading">
+                      <i class="fa fa-keyboard-o  fa-fw"></i> 资产查询
+                  </div>
+                  <div class="panel-body">
+
+				      <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">项目:</label>
+								<div class="col-sm-8">
+									 <select class="form-control" id="seldb_Project" >
+									 	<option selected="selected" value="">请选择一个类型</option>
+									 	{% for b in baseAssets.project %}
+									 		<option value="{{b.id}}" name="db_project">{{b.project_name}}</option>
+									 	{% endfor %}
+									</select>
+								</div>
+							</div>
+				      </div>
+				      <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">DB类型:</label>
+								<div class="col-sm-8">
+									 <select class="form-control" id="seldb_type" >
+									 	<option selected="selected" value="">请选择一个类型</option>
+											<option value="MySQL" name="db_type" >MySQL</option>
+											<option value="Redis" name="db_type" >Redis</option>
+											<option value="Mongodb" name="db_type" >Mongodb</option>
+											<option value="MyCAT" name="db_type" >MyCAT</option>
+											<option value="Oracle" name="db_type" >Oracle</option>
+											<option value="MSSQL" name="db_type" >MSSQL</option>
+									</select>
+								</div>
+							</div>
+				      </div>
+				      <div class="col-xs-6 col-sm-3">
+							<div class="form-group">
+								<label class="col-sm-3 control-label">实例:</label>
+								<div class="col-sm-8">
+									 <select class="form-control" id="id" onchange="javascript:oBtdbSelect({{ds.id}});">
+									 	<option selected="selected" value="">请选择实例</option>
+									</select>
+								</div>
+							</div>
+				      </div>
+                  </div>
+                  <div class="panel-footer">
+                  <div id="divSelectedType"></div>
+                  </div>
+              </div>
+          </div>
+     </div>
+	
+
+
+	<div class="row">
+				<div class="col-lg-12">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<i class="fa fa-wrench fa-fw"></i> 报告数据
+							<div class="pull-right">
+								<div class="btn-group">　
+								</div>
+							</div>
+						</div>
+						<!-- /.panel-heading -->
+						<div class="panel-body">
+							<div id="report_info" style="width: 100%; height: 0px"></div>
+						</div>
+						<!-- /.panel-body -->
+					</div>
+				</div>
+				<div class="col-lg-12">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<i class="fa fa-bar-chart-o fa-fw"></i> 监控数据
+							<div class="pull-right">
+								<div class="btn-group">　
+								</div>
+							</div>
+						</div>
+						<!-- /.panel-heading -->
+						<div class="panel-body">
+							<div id="morris-area-chart" style="width: 100%; height: 400px"></div>
+						</div>
+						<!-- /.panel-body -->
+					</div>
+				</div>
+				<div class="col-lg-12">
+					<div class="panel panel-default">
+						<div class="panel-heading">
+							<i class="fa fa-wrench fa-fw"></i> 日志数据
+							<div class="pull-right">
+								<div class="btn-group">　
+								</div>
+							</div>
+						</div>
+						<!-- /.panel-heading -->
+						<div class="panel-body">
+							<div id="log_info" style="width: 100%; height: 0px"></div>
+						</div>
+						<!-- /.panel-body -->
+					</div>
+				</div>
+
+	</div>
+    <script type="text/javascript">
+        var curpage = 1;
+        $(document).ready(function () {
+			//DB类型
+            $('#seldb_type').change(function () {
+                if ($('#seldb_type').val() != "") {
+                    $("#hdndb_type").val($('#seldb_type').val());
+                    var span = "<span class='label label-success' id='spandb_type'>" + $("#seldb_type").find("option:selected").text()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_type' type='hidden' value='"
+                    + $('#seldb_type').val() + "' /></span> &nbsp;";
+                    if ($("#spandb_type").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spandb_type").html($("#seldb_type").find("option:selected").text()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_type' type='hidden' value='"
+                         + $('#seldb_type').val() + "' /></span> &nbsp;");
+                    }
+                    oBtdbSelect(); 
+                }
+            })
+
+			//设备状态
+            $('#db_column').change(function () {
+                if ($('#db_column').val() != "") {
+                    $("#hdndb_env").val($('#db_column').val());
+                    var span = "<span class='label label-success' id='spandb_env'>" + $("#db_column").find("option:selected").text()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_column' type='hidden' value='"
+                    + $('#db_column').val() + "' /></span> &nbsp;";
+                    if ($("#spandb_env").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spandb_env").html($("#db_column").find("option:selected").text()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_column' type='hidden' value='"
+                         + $('#db_column').val() + "' /></span> &nbsp;");
+                    }
+                     changepage(1);
+                }
+            })
+            //ip地址
+            $('#id').change(function () {
+                if ($('#id').val() != "") {
+                    var span = "<span class='label label-success' id='spanIp'>" + $("#id").val()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='id' type='hidden' value='"
+                    + $('#id').val() + "' /></span> &nbsp;";
+                    if ($("#spanIp").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spanIp").html($("#id").val()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='id' type='hidden' value='"
+                         + $('#id').val() + "' /></span> &nbsp;");
+                    }
+                    changepage(1);
+                }
+            })
+			//所属项目
+            $('#seldb_Project').change(function () {
+                if ($('#seldb_Project').val() != "") {
+                    $("#hdnProject").val($('#seldb_Project').val());
+                    var span = "<span class='label label-success' id='spanSelinux'>" + $("#seldb_Project").find("option:selected").text()
+                    + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_project' type='hidden' value='"
+                    + $('#seldb_Project').val() + "' /></span> &nbsp;";
+                    if ($("#spanSelinux").length == 0) {
+                        $('#divSelectedType').append(span);
+                    }
+                    else {
+                        $("#spanSelinux").html($("#seldb_Project").find("option:selected").text()
+                         + " <img alt='' src='/static/img/close.png' onclick='removeself(this)' /><input name='db_project' type='hidden' value='"
+                         + $('#seldb_Project').val() + "' /></span> &nbsp;");
+                    }
+                }
+            })
+
+        })
+        function oBtdbSelect(){
+	 	   $('#id').removeAttr("disabled");
+	 	   var db_project=$('#seldb_Project').val();
+	 	   var db_type=$('#seldb_type').val();
+	 	   var db_id=$('#id').val();
+
+	 	   if ( db_id == "" ) {
+	 	   		db_id=0;
+
+	 	   }
+
+		   if ( db_type  != ''){
+				$.ajax({
+					dataType: "JSON",
+					url:'/db/search/', //请求地址
+					type:"POST",  //提交类似
+					data:{
+					db_project:db_project,
+					db_type:db_type,
+					type:2
+					},
+					success:function(response){
+
+						if (response["data"][db_id] == "" || response["data"][db_id] == "undefined" || response["data"][db_id]==null) {
+							v_info="请选择实例";
+							v_id=0;
+						}else{
+							v_info=response["data"][db_id];
+							v_id=db_id;
+						}
+						var binlogHtml = '<select multiple class="form-control"  name="id" id="id"  required><option name="id" value="'+v_id+'">'+v_info+'</option>'
+						var selectHtml = '';
+						$.each(response["data"],function(key,value){
+							selectHtml += '<option name="id" value="'+ key +'">' + value + '</option>'
+						});
+						binlogHtml =  binlogHtml + selectHtml +'<option name="id" value="-1">所有实例</option>'+ '</select>';
+						document.getElementById("id").innerHTML= binlogHtml;
+
+					},
+				});
+		   }
+		   else{
+			   $('#id option:selected').empty();
+			   $('#id').attr("disabled",true);
+		   }
+	    }
+
+		 
+
+        function changepage(pageindex) {
+            curpage = pageindex;
+            morris_highcharts();
+        }
+
+        function removeself(obj) {
+            $(obj).parent().remove();
+            changepage(1);
+        }
+
+		function morris_highcharts(){
+			var db_column=$('#db_column').val();
+	 	   	var db_project=$('#seldb_Project').val();
+	 	   	var db_type=$('#seldb_type').val();
+	 	   	var db_id=$('#id').val();
+			$.ajax({
+					type:"post",
+					url:"/db/report/",
+					data:{"db_id":db_id,"db_type":db_type,"db_project":db_project,"db_column":db_column},
+					dataType:"json",
+					success:function(data){
+						//报告内容
+						//alert(data.report.log["table_info"][0]);
+						document.getElementById("report_info").innerHTML= "" ;
+						document.getElementById("report_info").innerHTML= format_report(data.report.report) ;
+						//日志内容
+						document.getElementById("log_info").innerHTML= "" ;
+						document.getElementById("log_info").innerHTML= format_log(data.report.log) ;
+						//走势图
+						$("#morris-area-chart").highcharts({
+							chart: {"type": 'line', "zoomType": "x"},
+							title:data.data.title,
+							subtitle: data.data.subtitle,
+							xAxis:{ "type":"datetime"},//X轴数据
+							yAxis:{"title":{"text":""}},//Y轴数据
+							tooltip: { "pointFormat":" {series.name} <b> {point.y:,.0f}</b>",
+										// "pointFormat":'<span style="color:{series.color}">{series.name}</span>: <b>{point.percentage:.1f}%</b> ({point.y:,.0f} )<br>',
+										"shared":'true',
+										//"crosshairs":"true",
+										"valueSuffix":'°C'},
+							// 动画效果
+							plotOptions:{ "area":{
+										"stacking":'percent',
+										"lineColor": '#ffffff',
+										"lineWidth": 1,
+										"marker":{"lineWidth":'1',
+										"lineColor":'#ffffff'}
+								}},
+							series:data.data.series,
+							//不显示LOGO
+							credits:{"enabled":false},
+							//图例说明
+							legend:{"labelFormat":'{name}'},
+							lang:{
+									"contextButtonTitle" : "图表导出菜单",
+									"decimalPoint" : ".",
+									"downloadJPEG" : "下载JPEG图片",
+									"downloadPDF" : "下载PDF文件",
+									"downloadPNG" : "下载PNG文件",
+									"downloadSVG" : "下载SVG文件",
+									"drillUpText" : "返回 {series.name}",
+									"loading" : "加载中",
+									"months" : '["一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"]',
+									"noData" : "没有数据",
+									"numericSymbols" : '[ "千" , "兆" , "G" , "T" , "P" , "E"]',
+									"printChart" : "打印图表",
+									"resetZoom" : "恢复缩放",
+									"resetZoomTitle" : "恢复图表",
+									"shortMonths" : '[ "一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"]',
+									"thousandsSep" : ",",
+									"weekdays" :'["星期一", "星期二", "星期三", "星期三", "星期四", "星期五", "星期六","星期天"]'
+									},
+							global:data.data.global,
+							setOptions:{
+									"global":{"timezoneOffset":-8 * 60},
+									"decimalPoint": '.',
+									"thousandsSep":',',
+									"timezoneOffset":'+8 * 60',
+									"numericSymbols":'k,M,G,T,P,E'   
+								}
+						});
+					}
+			
+			});
+		}
+		function format_log(data) {
+	    /* 日志内容 */
+	    	var dbtype=data["dbtype"];
+
+			if ( dbtype=="mysql" ) {
+				/*表数据*/
+				var datalist=data["table_info"];
+				var trBaseHtml='';
+				var vBaseHtml = '<div class="row"><div class="col-lg-12"><table class="table table-bordered"><caption>表日志信息</caption>';
+				vBaseHtml += '<tr><td>表名</td><td>查询次数</td><td>查询时间</td><td>平均时间</td><td>最大时间</td><td>发送记录数(M)</td><td>扩展记录数(M)</td></tr>';
+				for (var i=0; i <datalist.length; i++){
+						trBaseHtml +='<tr><td>'+datalist[i][0]+'</td><td>'+datalist[i][1]["count"]+'</td><td>'+(datalist[i][1]["query_time"]).toFixed(2)
+						+'</td><td>'+(datalist[i][1]["query_time"]/datalist[i][1]["count"]).toFixed(2)+'</td><td>'+(datalist[i][1]["max_query"]).toFixed(2)+'</td><td>'+(datalist[i][1]["rows_sent"]/1024/1024).toFixed(2)+'</td><td>'+(datalist[i][1]["rows_examined"]/1024/1024).toFixed(2)+'</td></tr>';
+				};
+ 	    		vBaseHtml +=  trBaseHtml+'</table></div></div>';
+ 	    		/*SQL数据*/
+ 	    		datalist=data["sql"];
+				for (var i=0; i <datalist.length; i++){
+						var trBaseHtml='';
+						vBaseHtml += '<div class="row"><div class="col-lg-12"><table class="table table-bordered"><caption>'+datalist[i]["table"]+'表信息</caption>';
+						vBaseHtml += '<tr><td  width="50%">SQL</td><td>查询次数</td><td>查询时间</td><td>平均时间</td><td>最大时间</td><td>锁时间</td><td>发送记录数(M)</td><td>扩展记录数(M)</td></tr>';
+						for (var x=0; x <datalist[i]["sql"].length; x++){
+							trBaseHtml +='<tr><td>'+datalist[i]["sql"][x][1]["sql"]+'</td><td>'+datalist[i]["sql"][x][1]["count"]+'</td><td>'+(datalist[i]["sql"][x][1]["query_time"]).toFixed(2)
+							+'</td><td>'+(datalist[i]["sql"][x][1]["query_time"]/datalist[i]["sql"][x][1]["count"]).toFixed(2)+'</td><td>'+(datalist[i]["sql"][x][1]["max_query"]).toFixed(2)
+							+'</td><td>'+(datalist[i]["sql"][x][1]["lock_time"]/1024/1024).toFixed(2)+'</td><td>'
+							+(datalist[i]["sql"][x][1]["rows_sent"]/1024/1024).toFixed(2)+'</td><td>'+(datalist[i]["sql"][x][1]["rows_examined"]/1024/1024).toFixed(2)+'</td></tr>';
+						};
+						vBaseHtml +=  trBaseHtml+'</table></div></div>';
+				};
+			}
+			else if ( dbtype=="mongodb" ) {
+				/*表数据*/
+				var datalist=data["table_info"];
+				var trBaseHtml='';
+				var vBaseHtml = '<div class="row"><div class="col-lg-12"><table class="table table-bordered"><caption>表日志信息</caption>';
+				vBaseHtml += '<tr><td>表名</td><td>查询次数</td><td>查询时间</td><td>平均时间</td><td>最大时间</td><td>命令</td><td>库名</td></tr>';
+				for (var i=0; i <datalist.length; i++){
+						trBaseHtml +='<tr><td>'+datalist[i][0]+'</td><td>'+datalist[i][1]["count"]+'</td><td>'+(datalist[i][1]["query_time"]).toFixed(2)
+						+'</td><td>'+(datalist[i][1]["query_time"]/datalist[i][1]["count"]).toFixed(2)+'</td><td>'+(datalist[i][1]["max_query"]).toFixed(2)
+						+'</td><td>'+datalist[i][1]["commend"] +'</td><td>'+datalist[i][1]["dbname"] +'</td></tr>';
+				};
+ 	    		vBaseHtml +=  trBaseHtml+'</table></div></div>';
+ 	    		/*SQL数据*/
+ 	    		datalist=data["sql"];
+				for (var i=0; i <datalist.length; i++){
+						var trBaseHtml='';
+						vBaseHtml += '<div class="row"><div class="col-lg-12"><table class="table table-bordered"><caption>'+datalist[i]["table"]+'表信息</caption>';
+						vBaseHtml += '<tr><td  width="50%">SQL</td><td>查询次数</td><td>查询时间</td><td>平均时间</td><td>最大时间</td><td>命令</td><td>库名</td></tr>';
+						for (var x=0; x <datalist[i]["sql"].length; x++){
+							trBaseHtml +='<tr><td>'+datalist[i]["sql"][x][1]["sql"]+'</td><td>'+datalist[i]["sql"][x][1]["count"]+'</td><td>'+(datalist[i]["sql"][x][1]["query_time"]).toFixed(2)
+							+'</td><td>'+(datalist[i]["sql"][x][1]["query_time"]/datalist[i]["sql"][x][1]["count"]).toFixed(2)+'</td><td>'+(datalist[i]["sql"][x][1]["max_query"]).toFixed(2)
+							+'</td><td>'+datalist[i]["sql"][x][1]["commend"] +'</td><td>'
+							+datalist[i]["sql"][x][1]["dbname"] +'</td></tr>';
+						};
+						vBaseHtml +=  trBaseHtml+'</table></div></div>';
+				};
+			}
+			else{
+				datalist=data["sql"];
+				var vBaseHtml='';
+				var trBaseHtml='';
+				vBaseHtml += '<div class="row"><div class="col-lg-12"><table class="table table-bordered"><caption>日志信息</caption>';
+				vBaseHtml += '<tr><td  width="50%">日志</td><td>查询次数</td></tr>';
+				for (var i=0; i <datalist.length; i++){
+					trBaseHtml +='<tr><td>'+datalist[i][0]+'</td><td>'+datalist[i][1]["count"]+'</td></tr>';
+
+				};
+				vBaseHtml +=  trBaseHtml+'</table></div></div>';
+			}
+		/* 汇总 */
+		return vBaseHtml
+	}
+	function format_report(data) {
+	    /* 报告内容 */
+	    	/*表数据*/
+	    	var dbtype=data["dbtype"];
+			var tableinfo=data["item"];
+			var vBaseHtml = ''; 
+			var tb_list=tableinfo['list'].split(",");
+			for (var z=0 ;z<tb_list.length; z++){
+					var total= new Array();
+					var total_all='';
+					var key=tb_list[z];
+					var total_type=0;
+					var value=tableinfo[key];
+					//alert(value);
+					vBaseHtml += '<div class="row"><div class="col-lg-12"><table class="table table-bordered"><tr><caption>'+key+'</caption></tr>';
+					var col_list=value['col'].split(",");
+					var name_list='<tr>';
+					var data_list='';
+					for (var x=0 ;x<col_list.length; x++){
+						if ( col_list[x]!="total" ){
+							var y=col_list[x];
+							name_list+='<td>'+col_list[x]+'</td>';
+							total[y]=0;
+						}
+
+					};
+					name_list+='</tr>'
+					for (var i=0; i <value['data'].length; i++){
+						data_list +='<tr>';
+						for (x=0 ;x<col_list.length; x++){
+							var y=col_list[x];
+							//total[y]+=total[y]+value['data'][i][y];
+							if ( y=="total" ){
+								 total[y]=0;
+							}else if ( y=="主机" ){
+								total[y]='汇总';
+								data_list +='<td>'+value['data'][i][y]+'</td>';
+							}
+							else{
+								if ( isNaN(value['data'][i][y]) ) {
+									total[y]='无'
+								}else{
+									total[y] +=Number(parseFloat(value['data'][i][y]));
+								}
+								data_list +='<td>'+value['data'][i][y]+'</td>';
+							}
+
+						};
+						data_list +='</tr>';
+					};
+					for (x=0 ;x<col_list.length; x++){
+						if ( col_list[x]!="total" ){
+							var y=col_list[x]; 
+							if ( !isNaN(total[y])){ 
+								total_all+='<td>'+total[y].toFixed(0)+'</td>';
+							}else{
+								total_all+='<td>'+total[y]+'</td>';
+							}
+						}else{
+							var total_type=1;
+						}
+							
+					};
+					if (total_type!="1" ) {
+						total_all='';
+					}
+					vBaseHtml +=name_list+data_list+total_all+'</table></div></div>';
+			};
+
+			//vBaseHtml +='<tr>'+key_list+'</tr><tr>'+val_list+'</tr>';
+		/* 汇总 */
+		return vBaseHtml
+	}
+</script>
+{% endblock %}
